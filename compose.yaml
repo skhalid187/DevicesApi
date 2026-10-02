@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-devices}
+      POSTGRES_USER: ${POSTGRES_USER:-devices}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devices_local}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - devices-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  api:
+    build: .
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-devices}
+      DB_USERNAME: ${POSTGRES_USER:-devices}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-devices_local}
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  devices-data:
