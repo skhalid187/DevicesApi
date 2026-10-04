@@ -1,5 +1,6 @@
 package com.example.devices.controller;
 
+import com.example.devices.domain.DeviceConstants;
 import com.example.devices.domain.DeviceState;
 import com.example.devices.dto.DevicePageResponse;
 import com.example.devices.dto.DevicePatchRequest;
@@ -8,8 +9,11 @@ import com.example.devices.dto.DeviceWriteRequest;
 import com.example.devices.exception.InvalidDeviceRequestException;
 import com.example.devices.service.DeviceService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import java.net.URI;
+import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -35,19 +39,23 @@ public class DeviceController {
     @GetMapping
     public DevicePageResponse findAll(@RequestParam(required = false) String brand,
             @RequestParam(required = false) String state,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return service.findAll(brand, parseState(state), page, size);
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        String strippedBrand = brand != null ? brand.strip() : null;
+        validateBrandFilter(strippedBrand);
+        return service.findAll(strippedBrand, parseState(state), page, size);
+    }
+
+    private void validateBrandFilter(String brand) {
+        if (brand != null) {
+            if (brand.isEmpty() || brand.length() > DeviceConstants.MAX_FIELD_LENGTH) {
+                throw new InvalidDeviceRequestException(DeviceConstants.ERROR_BRAND_LENGTH);
+            }
+        }
     }
 
     private DeviceState parseState(String state) {
-        if (state == null) {
-            return null;
-        }
-        try {
-            return DeviceState.fromValue(state);
-        } catch (IllegalArgumentException exception) {
-            throw new InvalidDeviceRequestException(exception.getMessage());
-        }
+        return state == null ? null : DeviceState.fromValue(state);
     }
 
     @GetMapping("/{id}")

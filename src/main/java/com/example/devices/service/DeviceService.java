@@ -1,17 +1,15 @@
 package com.example.devices.service;
 
 import com.example.devices.domain.Device;
+import com.example.devices.domain.DeviceConstants;
 import com.example.devices.domain.DeviceState;
 import com.example.devices.dto.DevicePageResponse;
 import com.example.devices.dto.DevicePatchRequest;
 import com.example.devices.dto.DeviceResponse;
 import com.example.devices.dto.DeviceWriteRequest;
-import com.example.devices.exception.DeviceConflictException;
 import com.example.devices.exception.DeviceNotFoundException;
-import com.example.devices.exception.InvalidDeviceRequestException;
 import com.example.devices.repository.DeviceRepository;
 import java.util.Locale;
-import java.util.Objects;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -29,22 +27,16 @@ public class DeviceService {
 
     @Transactional(readOnly = true)
     public DevicePageResponse findAll(String brand, DeviceState state, int page, int size) {
-        if (page < 0 || size < 1 || size > 100) {
-            throw new InvalidDeviceRequestException("page must be non-negative and size must be between 1 and 100");
-        }
         Specification<Device> filter = (root, query, cb) -> cb.conjunction();
         if (brand != null) {
-            String normalized = brand.strip().toLowerCase(Locale.ROOT);
-            if (normalized.isEmpty() || normalized.length() > 100) {
-                throw new InvalidDeviceRequestException("brand must contain between 1 and 100 characters");
-            }
+            String normalized = brand.toLowerCase(Locale.ROOT);
             filter = filter.and((root, query, cb) -> cb.equal(cb.lower(root.get("brand")), normalized));
         }
         if (state != null) {
             filter = filter.and((root, query, cb) -> cb.equal(root.get("state"), state));
         }
         return DevicePageResponse.from(repository.findAll(filter,
-                PageRequest.of(page, size, Sort.by("id"))).map(DeviceResponse::from));
+                PageRequest.of(page, size, Sort.by(DeviceConstants.DEFAULT_SORT_FIELD))).map(DeviceResponse::from));
     }
 
     @Transactional(readOnly = true)
@@ -65,25 +57,21 @@ public class DeviceService {
 
     public DeviceResponse patch(long id, DevicePatchRequest request) {
         Device device = findDeviceForUpdate(id);
-        updateDevice(device, request.name() == null ? device.getName() : request.name(),
-                request.brand() == null ? device.getBrand() : request.brand(),
-                request.state() == null ? device.getState() : request.state());
+        updateDevice(device,
+                request.name() != null ? request.name() : device.getName(),
+                request.brand() != null ? request.brand() : device.getBrand(),
+                request.state() != null ? request.state() : device.getState());
         return DeviceResponse.from(device);
     }
 
     public void delete(long id) {
         Device device = findDeviceForUpdate(id);
-        if (device.getState() == DeviceState.IN_USE) {
-            throw new DeviceConflictException("An in-use device cannot be deleted");
-        }
+        DeviceStateValidator.validateDelete(device);
         repository.delete(device);
     }
 
     private void updateDevice(Device device, String name, String brand, DeviceState state) {
-        if (device.getState() == DeviceState.IN_USE
-                && (!Objects.equals(device.getName(), name) || !Objects.equals(device.getBrand(), brand))) {
-            throw new DeviceConflictException("Name and brand cannot be changed while the device is in use");
-        }
+        DeviceStateValidator.validateUpdate(device, name, brand);
         device.update(name, brand, state);
     }
 

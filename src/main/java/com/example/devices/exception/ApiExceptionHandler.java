@@ -21,19 +21,26 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger LOG = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
-    @ExceptionHandler(DeviceNotFoundException.class)
-    ProblemDetail notFound(DeviceNotFoundException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+    @ExceptionHandler({
+        DeviceNotFoundException.class,
+        DeviceConflictException.class,
+        InvalidDeviceRequestException.class,
+        IllegalArgumentException.class
+    })
+    ProblemDetail handleDeviceExceptions(Exception exception) {
+        HttpStatus status = determineStatus(exception);
+        return ProblemDetail.forStatusAndDetail(status, exception.getMessage());
     }
 
-    @ExceptionHandler(DeviceConflictException.class)
-    ProblemDetail conflict(DeviceConflictException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
-    }
-
-    @ExceptionHandler(InvalidDeviceRequestException.class)
-    ProblemDetail invalidRequest(InvalidDeviceRequestException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+    private HttpStatus determineStatus(Exception exception) {
+        if (exception instanceof DeviceNotFoundException) {
+            return HttpStatus.NOT_FOUND;
+        } else if (exception instanceof DeviceConflictException) {
+            return HttpStatus.CONFLICT;
+        } else if (exception instanceof InvalidDeviceRequestException || exception instanceof IllegalArgumentException) {
+            return HttpStatus.BAD_REQUEST;
+        }
+        return HttpStatus.INTERNAL_SERVER_ERROR;
     }
 
     @Override

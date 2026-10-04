@@ -18,10 +18,10 @@ public class Device {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = DeviceConstants.MAX_FIELD_LENGTH)
     private String name;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = DeviceConstants.MAX_FIELD_LENGTH)
     private String brand;
 
     @Enumerated(EnumType.STRING)
